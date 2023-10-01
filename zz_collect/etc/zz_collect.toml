@@ -1,0 +1,14 @@
+[collect]
+vacant_mobile_number_worker_pool_core_size=7
+vacant_mobile_number_worker_pool_max_size=7
+
+# 移动空号采集开关
+vacant_mobile_switch=true
+
+[common]
+task_center_address="60.188.245.8:10002"
+
+# 号码检测数据同步
+push_center_address="60.188.245.8:10002"
+
+res_id=5
