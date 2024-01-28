@@ -1,5 +1,19 @@
+#include <fstream>
+#include <vector>
+#include <openssl/err.h>
+#include <openssl/rand.h>
+#include <openssl/rsa.h>
+#include <openssl/engine.h>
+#include <openssl/sha.h>
+#include <openssl/hmac.h>
+#include <openssl/evp.h>
+#include <openssl/bio.h>
+#include <openssl/pem.h>
+#include <openssl/buffer.h>
+#include <openssl/x509.h>
+#include <lwpr.h>
+
 #include "Cipher.h"
- 
 
 #ifndef FIXED_TABLES
 
@@ -409,48 +423,79 @@ uint32 KT3[256];
 namespace ZZ_TOOLS
 {
 
+//get the bit length after zero padding (one of 128, 192, 256), skey.length() must be <= 32.
+int keybits(const std::string &skey)
+{
+	int len = skey.length() < 16 ? 16 : skey.length(); //make sure (len/8)*64 >= 128
+	return (len / 8) * 64;
+}
+
+//a向上取整为b的倍数
+inline int roundon(int a, int b)
+{
+	return a % b == 0 ? a : a + b - a % b;
+}
+
+//copy and do Pkcs7 padding, src needs to be null-terminated, buff needs to be big enough.
+int padcpy(uint8_t *buff, const void *src)
+{
+    auto srclen = strlen((const char *)src);
+    memcpy(buff, src, srclen);
+    
+    uint8_t padval = BLOCK_SIZE - srclen % BLOCK_SIZE;  //0 < padval <= 16
+    for (size_t i = srclen; i < srclen + padval; i++)
+        buff[i] = padval;
+    return srclen + padval;
+}
+
+inline void XOR(const uint8 a[16], const uint8 b[16], uint8 c[16])
+{
+    for (int i = 0; i <16; i++)
+        c[i] = a[i] ^ b[i];
+}
+
 int base64_encode(const unsigned char *src, int src_bytes, char *out)
 {
-	const char EncodeTable[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const char EncodeTable[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
  
-	unsigned char Tmp[4] = {0};
-	// int LineLength = 0;
-	int i = 0;
-	for (int j = 0; j < (int)(src_bytes / 3); j++)
-	{
-		Tmp[1] = *src++;
-		Tmp[2] = *src++;
-		Tmp[3] = *src++;
-		out[i++] = EncodeTable[Tmp[1] >> 2];
-		out[i++] = EncodeTable[((Tmp[1] << 4) | (Tmp[2] >> 4)) & 0x3F];
-		out[i++] = EncodeTable[((Tmp[2] << 2) | (Tmp[3] >> 6)) & 0x3F];
-		out[i++] = EncodeTable[Tmp[3] & 0x3F];
-		// if (LineLength += 4, LineLength == 76)
-		// {
-		// 	out[i++] = '\r';
-		// 	out[i++] = '\n';
-		// 	LineLength = 0;
-		// }
-	}
-	int Mod = src_bytes % 3;
-	if (Mod == 1)
-	{
-		Tmp[1] = *src++;
-		out[i++] = EncodeTable[(Tmp[1] & 0xFC) >> 2];
-		out[i++] = EncodeTable[((Tmp[1] & 0x03) << 4)];
-		out[i++] = '=';
-		out[i++] = '=';
-	}
-	else if (Mod == 2)
-	{
-		Tmp[1] = *src++;
-		Tmp[2] = *src++;
-		out[i++] = EncodeTable[(Tmp[1] & 0xFC) >> 2];
-		out[i++] = EncodeTable[((Tmp[1] & 0x03) << 4) | ((Tmp[2] & 0xF0) >> 4)];
-		out[i++] = EncodeTable[((Tmp[2] & 0x0F) << 2)];
-		out[i++] = '=';
-	}
-	return i;
+    unsigned char Tmp[4] = {0};
+    // int LineLength = 0;
+    int i = 0;
+    for (int j = 0; j < (int)(src_bytes / 3); j++)
+    {
+        Tmp[1] = *src++;
+        Tmp[2] = *src++;
+        Tmp[3] = *src++;
+        out[i++] = EncodeTable[Tmp[1] >> 2];
+        out[i++] = EncodeTable[((Tmp[1] << 4) | (Tmp[2] >> 4)) & 0x3F];
+        out[i++] = EncodeTable[((Tmp[2] << 2) | (Tmp[3] >> 6)) & 0x3F];
+        out[i++] = EncodeTable[Tmp[3] & 0x3F];
+        // if (LineLength += 4, LineLength == 76)
+        // {
+        // 	out[i++] = '\r';
+        // 	out[i++] = '\n';
+        // 	LineLength = 0;
+        // }
+    }
+    int Mod = src_bytes % 3;
+    if (Mod == 1)
+   {
+        Tmp[1] = *src++;
+        out[i++] = EncodeTable[(Tmp[1] & 0xFC) >> 2];
+        out[i++] = EncodeTable[((Tmp[1] & 0x03) << 4)];
+        out[i++] = '=';
+        out[i++] = '=';
+    }
+    else if (Mod == 2)
+    {
+        Tmp[1] = *src++;
+        Tmp[2] = *src++;
+        out[i++] = EncodeTable[(Tmp[1] & 0xFC) >> 2];
+        out[i++] = EncodeTable[((Tmp[1] & 0x03) << 4) | ((Tmp[2] & 0xF0) >> 4)];
+        out[i++] = EncodeTable[((Tmp[2] & 0x0F) << 2)];
+        out[i++] = '=';
+    }
+    return i;
 }
  
 int base64_decode(const char *in, int input_len, unsigned char *out)
@@ -502,7 +547,7 @@ int base64_decode(const char *in, int input_len, unsigned char *out)
 	return i;
 }
 
-int aes_set_key( aes_context *ctx, uint8 *key, int nbits )
+int AES_TOOL::aes_set_key( aes_context *ctx, uint8 *key, int nbits )
 {
     int i;
     uint32 *RK, *SK;
@@ -653,7 +698,7 @@ int aes_set_key( aes_context *ctx, uint8 *key, int nbits )
 
 /* AES 128-bit block encryption routine */
 
-void aes_encrypt( aes_context *ctx, uint8 input[16], uint8 output[16] )
+void AES_TOOL::aes_encrypt( aes_context *ctx, uint8 input[16], uint8 output[16] )
 {
     uint32 *RK, X0, X1, X2, X3, Y0, Y1, Y2, Y3;
 
@@ -743,7 +788,7 @@ void aes_encrypt( aes_context *ctx, uint8 input[16], uint8 output[16] )
 
 /* AES 128-bit block decryption routine */
 
-void aes_decrypt( aes_context *ctx, uint8 input[16], uint8 output[16] )
+void AES_TOOL::aes_decrypt( aes_context *ctx, uint8 input[16], uint8 output[16] )
 {
     uint32 *RK, X0, X1, X2, X3, Y0, Y1, Y2, Y3;
 
@@ -831,40 +876,8 @@ void aes_decrypt( aes_context *ctx, uint8 input[16], uint8 output[16] )
     PUT_UINT32( X3, output, 12 );
 }
 
-//get the bit length after zero padding (one of 128, 192, 256), skey.length() must be <= 32.
-int keybits(const std::string &skey)
-{
-	int len = skey.length() < 16 ? 16 : skey.length(); //make sure (len/8)*64 >= 128
-	return (len / 8) * 64;
-}
-
-//a向上取整为b的倍数
-inline int roundon(int a, int b)
-{
-	return a % b == 0 ? a : a + b - a % b;
-}
-
-//copy and do Pkcs7 padding, src needs to be null-terminated, buff needs to be big enough.
-int padcpy(uint8_t *buff, const void *src)
-{
-	auto srclen = strlen((const char *)src);
-	memcpy(buff, src, srclen);
-    
-    uint8_t padval = BLOCK_SIZE - srclen % BLOCK_SIZE;  //0 < padval <= 16
-    for (size_t i = srclen; i < srclen + padval; i++)
-        buff[i] = padval;
-    return srclen + padval;
-}
-
- 
-inline void XOR(const uint8 a[16], const uint8 b[16], uint8 c[16])
-{
-	for (int i = 0; i <16; i++)
-		c[i] = a[i] ^ b[i];
-}
-
 //note: the length of skey should be <= 32; no length check conducted
-std::string encrypt(const std::string &plaintext, const std::string &skey)
+std::string AES_TOOL::encrypt(const std::string &plaintext, const std::string &skey)
 {
 	aes_context ctx;
 	uint8 key[32] = {0}; //zero padding
@@ -883,12 +896,14 @@ std::string encrypt(const std::string &plaintext, const std::string &skey)
 	char *basebuf = new char[baselen];
 	base64_encode(output, outlen, basebuf);
 	std::string ret(basebuf, baselen);
+
 	delete[] basebuf;
 	delete[] output;
+
 	return ret;
 }
  
-std::string decrypt(const std::string &basestr, const std::string &skey)
+std::string AES_TOOL::decrypt(const std::string &basestr, const std::string &skey)
 {
 	aes_context ctx;
 	uint8 key[32] = {0};
@@ -910,10 +925,11 @@ std::string decrypt(const std::string &basestr, const std::string &skey)
 }
 
 //note: the length of skey should be <= 32, the length of siv should be <= 16, no length check conducted
-std::string encrypt_cbc(const std::string &plaintext, const std::string &skey, const std::string &siv)
+std::string AES_TOOL::encrypt_cbc(const std::string &plaintext, const std::string &skey, const std::string &siv)
 {
 	uint8 iv[16] = {0}; //zero padding
 	memcpy(iv, siv.c_str(), siv.length());
+
 	aes_context ctx;
 	uint8 key[32] = {0}; //zero padding
 	memcpy(key, skey.c_str(), skey.length());
@@ -936,13 +952,15 @@ std::string encrypt_cbc(const std::string &plaintext, const std::string &skey, c
 	std::string ret(basebuf, baselen);
 	delete[] basebuf;
 	delete[] output;
+
 	return ret;
 }
 
-std::string decrypt_cbc(const std::string &basestr, const std::string &skey, const std::string &siv)
+std::string AES_TOOL::decrypt_cbc(const std::string &basestr, const std::string &skey, const std::string &siv)
 {
 	uint8 iv[16] = {0}; //zero padding
 	memcpy(iv, siv.c_str(), siv.length());
+    
 	aes_context ctx;
 	uint8 key[32] = {0};
 	memcpy(key, skey.c_str(), skey.length());
@@ -971,4 +989,303 @@ std::string decrypt_cbc(const std::string &basestr, const std::string &skey, con
 	return ret;
 }
 
-};
+/*
+#define RSA_KEY_LENGTH    1024
+#define PUB_KEY_FILE      "public.cert"
+#define PRI_KEY_FILE      "private.cert"
+
+void RSA_TOOL::gen_rsa_key(std::string & out_pub_key, std::string & out_pri_key)
+{
+    size_t pri_len = 0; // 私钥长度
+    size_t pub_len = 0; // 公钥长度
+    char *pri_key = NULL; // 私钥
+    char *pub_key = NULL; // 公钥
+
+    // 生成密钥对
+    RSA *keypair = RSA_generate_key(RSA_KEY_LENGTH, RSA_3, NULL, NULL);
+
+    BIO *pri = BIO_new(BIO_s_mem());
+    BIO *pub = BIO_new(BIO_s_mem());
+
+    // 生成私钥
+    PEM_write_bio_RSAPrivateKey(pri, keypair, NULL, NULL, 0, NULL, NULL);
+    
+    // 注意------生成第1种格式的公钥
+    // PEM_write_bio_RSAPublicKey(pub, keypair);
+    // 注意------生成第2种格式的公钥（此处代码中使用这种）
+    PEM_write_bio_RSA_PUBKEY(pub, keypair);
+
+    // 获取长度  
+    pri_len = BIO_pending(pri);
+    pub_len = BIO_pending(pub);
+
+    // 密钥对读取到字符串
+
+    pri_key = new char[pri_len + 1], pri_key[pri_len] = '\0';
+    pub_key = new char[pub_len + 1], pub_key[pub_len] = '\0';
+
+    BIO_read(pri, pri_key, pri_len);
+    BIO_read(pub, pub_key, pub_len);
+
+    out_pub_key = pub_key;
+    out_pri_key = pri_key;
+
+    // 将公钥写入文件
+    std::ofstream pub_file(PUB_KEY_FILE, std::ios::out);
+    if (!pub_file.is_open())
+    {
+        perror("pub key file open fail:");
+        return;
+    }
+    pub_file << pub_key;
+    pub_file.close();
+ 
+    // 将私钥写入文件
+    std::ofstream pri_file(PRI_KEY_FILE, std::ios::out);
+    if (!pri_file.is_open())
+    {
+        perror("pri key file open fail:");
+        return;
+    }
+    pri_file << pri_key;
+    pri_file.close();
+
+    // 释放内存
+    RSA_free(keypair);
+    BIO_free_all(pub);
+    BIO_free_all(pri);
+
+    delete[] pri_key;
+    delete[] pub_key;
+}
+*/
+
+std::string RSA_TOOL::rsa_pri_encrypt(const std::string &clear_text, std::string &pri_key)
+{
+    std::string encrypt_text;
+    BIO *keybio = BIO_new_mem_buf((unsigned char *)pri_key.c_str(), -1);
+    RSA* rsa = RSA_new();
+    rsa = PEM_read_bio_RSAPrivateKey(keybio, &rsa, NULL, NULL);
+    if (!rsa)
+    {
+        unsigned long err = ERR_get_error(); //获取错误号
+        char err_msg[1024] = { 0 };
+        ERR_error_string(err, err_msg); // 格式：error:errId:库:函数:原因
+        logger->error(LTRACE, "rsa_pub_encrypt err msg: err:%ld, msg:%s", err , err_msg);
+        BIO_free_all(keybio);
+
+        return std::string("");
+    }
+
+    // 获取RSA单次可以处理的数据块的最大长度
+    int key_len = RSA_size(rsa);
+    int block_len = key_len - 11;    // 因为填充方式为RSA_PKCS1_PADDING, 所以要在key_len基础上减去11
+
+    // 申请内存：存贮加密后的密文数据
+    char *sub_text = new char[key_len + 1];
+    memset(sub_text, 0, key_len + 1);
+
+    int ret = 0;
+    int pos = 0;
+    std::string sub_str;
+    // 对数据进行分段加密（返回值是加密后数据的长度）
+    while (pos < clear_text.length()) {
+        sub_str = clear_text.substr(pos, block_len);
+        memset(sub_text, 0, key_len + 1);
+        ret = RSA_private_encrypt(sub_str.length(), (const unsigned char*)sub_str.c_str(), (unsigned char*)sub_text, rsa, RSA_PKCS1_PADDING);
+        if (ret >= 0) {
+            encrypt_text.append(std::string(sub_text, ret));
+        }
+        pos += block_len;
+    }
+
+    // 释放内存  
+    delete[] sub_text;
+    BIO_free_all(keybio);
+    RSA_free(rsa);
+
+    return encrypt_text;
+}
+
+std::string RSA_TOOL::rsa_pub_encrypt(const std::string &clear_text, const std::string &pub_key)
+{
+    std::string encrypt_text;
+    BIO *keybio = BIO_new_mem_buf((unsigned char *)pub_key.c_str(), -1);
+    RSA* rsa = RSA_new();
+
+    // 注意-----第1种格式的公钥
+    // rsa = PEM_read_bio_RSAPublicKey(keybio, &rsa, NULL, NULL);
+
+    // 注意-----第2种格式的公钥（这里以第二种格式为例）
+    rsa = PEM_read_bio_RSA_PUBKEY(keybio, &rsa, NULL, NULL);
+    if (!rsa)
+    {
+        unsigned long err = ERR_get_error(); //获取错误号
+        char err_msg[1024] = { 0 };
+        ERR_error_string(err, err_msg); // 格式：error:errId:库:函数:原因
+        logger->error(LTRACE, "rsa_pub_encrypt err msg: err:%ld, msg:%s", err , err_msg);
+        BIO_free_all(keybio);
+
+        return std::string("");
+    }
+
+    // 获取RSA单次可以处理的数据块的最大长度
+    int key_len = RSA_size(rsa);
+    int block_len = key_len - 11;    // 因为填充方式为RSA_PKCS1_PADDING, 所以要在key_len基础上减去11
+ 
+    // 申请内存：存贮加密后的密文数据
+    char *sub_text = new char[key_len + 1];
+    memset(sub_text, 0, key_len + 1);
+
+    int ret = 0;
+    int pos = 0;
+    std::string sub_str;
+    // 对数据进行分段加密（返回值是加密后数据的长度）
+    while (pos < clear_text.length()) {
+        sub_str = clear_text.substr(pos, block_len);
+        memset(sub_text, 0, key_len + 1);
+        ret = RSA_public_encrypt(sub_str.length(), (const unsigned char*)sub_str.c_str(), (unsigned char*)sub_text, rsa, RSA_PKCS1_PADDING);
+        if (ret >= 0) {
+            encrypt_text.append(std::string(sub_text, ret));
+        }
+        pos += block_len;
+    }
+
+    // 释放内存  
+    BIO_free_all(keybio);
+    RSA_free(rsa);
+    delete[] sub_text;
+
+    // return encrypt_text;
+    
+    size_t outlen = encrypt_text.length();
+    size_t baselen = roundon(outlen, 3) / 3 * 4;
+    char *basebuf = new char[baselen];
+    base64_encode((const unsigned char*) encrypt_text.c_str(), outlen, basebuf);
+    std::string result(basebuf, baselen);
+    delete[] basebuf;
+
+    return result;
+}
+
+std::string RSA_TOOL::rsa_pub_decrypt(const std::string & cipher_text, const std::string & pub_key)
+{
+    std::string decrypt_text;
+    BIO *keybio = BIO_new_mem_buf((unsigned char *)pub_key.c_str(), -1);
+    RSA* rsa = RSA_new();
+
+    // 注意-------使用第1种格式的公钥进行解密
+    // rsa = PEM_read_bio_RSAPublicKey(keybio, &rsa, NULL, NULL);
+    // 注意-------使用第2种格式的公钥进行解密（我们使用这种格式作为示例）
+    rsa = PEM_read_bio_RSA_PUBKEY(keybio, &rsa, NULL, NULL);
+    if (!rsa)
+    {
+        unsigned long err = ERR_get_error(); //获取错误号
+        char err_msg[1024] = { 0 };
+        ERR_error_string(err, err_msg); // 格式：error:errId:库:函数:原因
+        logger->error(LTRACE, "rsa_pub_encrypt err msg: err:%ld, msg:%s", err , err_msg);
+        BIO_free_all(keybio);
+        
+        return decrypt_text;
+    }
+ 
+    // 获取RSA单次处理的最大长度
+    int len = RSA_size(rsa);
+    char *sub_text = new char[len + 1];
+    memset(sub_text, 0, len + 1);
+    int ret = 0;
+    std::string sub_str;
+    int pos = 0;
+
+    // 对密文进行分段解密
+    while (pos < cipher_text.length()) {
+        sub_str = cipher_text.substr(pos, len);
+        memset(sub_text, 0, len + 1);
+        ret = RSA_public_decrypt(sub_str.length(), (const unsigned char*)sub_str.c_str(), (unsigned char*)sub_text, rsa, RSA_PKCS1_PADDING);
+        if (ret >= 0) {
+            decrypt_text.append(std::string(sub_text, ret));
+            // printf("pos:%d, sub: %s\n", pos, sub_text);
+            pos += len;
+        }
+    }
+
+    // 释放内存  
+    delete[] sub_text;
+    BIO_free_all(keybio);
+    RSA_free(rsa);
+
+    return decrypt_text;
+}
+
+std::string RSA_TOOL::rsa_pri_decrypt(const std::string &cipher_text, const std::string &pri_key)
+{
+    std::string decrypt_text;
+    RSA *rsa = RSA_new();
+    BIO *keybio;
+    keybio = BIO_new_mem_buf((unsigned char *)pri_key.c_str(), -1);
+
+    rsa = PEM_read_bio_RSAPrivateKey(keybio, &rsa, NULL, NULL);
+    if (rsa == NULL) {
+        unsigned long err = ERR_get_error(); //获取错误号
+        char err_msg[1024] = { 0 };
+        ERR_error_string(err, err_msg); // 格式：error:errId:库:函数:原因
+        logger->error(LTRACE, "rsa_pub_encrypt err msg: err:%ld, msg:%s", err , err_msg);
+        BIO_free_all(keybio);
+
+        return std::string();
+	}
+
+    // 获取RSA单次处理的最大长度
+    int key_len = RSA_size(rsa);
+    char *sub_text = new char[key_len + 1];
+    memset(sub_text, 0, key_len + 1);
+
+    int ret = 0;
+    std::string sub_str;
+    int pos = 0;
+
+    // 对密文进行分段解密
+    while (pos < cipher_text.length()) {
+        sub_str = cipher_text.substr(pos, key_len);
+        memset(sub_text, 0, key_len + 1);
+
+        ret = RSA_private_decrypt(sub_str.length(), (const unsigned char*)sub_str.c_str(), (unsigned char*)sub_text, rsa, RSA_PKCS1_PADDING);
+        if (ret >= 0) {
+            decrypt_text.append(std::string(sub_text, ret));
+            // printf("pos:%d, sub: %s\n", pos, sub_text);
+            pos += key_len;
+        }
+    }
+
+    // 释放内存  
+    delete[] sub_text;
+    BIO_free_all(keybio);
+    RSA_free(rsa);
+
+    return decrypt_text;
+}
+
+// 原始明文  
+// std::string src_text = "test begin\n this is an rsa test example!!!\n test end";
+// std::string encrypt_text;
+// std::string decrypt_text;
+
+// 生成密钥对
+// std::string pub_key;
+// std::string pri_key;
+// RSA_TOOL::gen_rsa_key(pub_key, pri_key);
+// printf("public key:%s, private key:%s\n", pub_key.c_str(), pri_key.c_str());
+
+// 私钥加密-公钥解密
+// encrypt_text = RSA_TOOL::rsa_pri_encrypt(src_text, pri_key);
+// decrypt_text = RSA_TOOL::rsa_pub_decrypt(encrypt_text, pub_key);
+// printf("encrypt: len=%d, %s\n", encrypt_text.length(), encrypt_text.c_str());
+// printf("decrypt: len=%d, %s\n", decrypt_text.length(), decrypt_text.c_str());
+
+// 公钥加密-私钥解密
+// encrypt_text = RSA_TOOL::rsa_pub_encrypt(src_text, pub_key);
+// decrypt_text = RSA_TOOL::rsa_pri_decrypt(encrypt_text, pri_key);
+// printf("encrypt: len=%d, %s\n", encrypt_text.length(), encrypt_text.c_str());
+// printf("decrypt: len=%d, %s\n", decrypt_text.length(), decrypt_text.c_str());
+
+}

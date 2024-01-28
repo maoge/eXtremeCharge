@@ -60,6 +60,8 @@ bool readConfig(const char *file, GlobalConf& globalConf)
     globalConf.commonConf.taskCenterAddress                     = Strings("common.task_center_address", "");
     globalConf.commonConf.pushCenterAddress                     = Strings("common.push_center_address", "");
     globalConf.commonConf.resId                                 = Integer("common.res_id", 1);
+    globalConf.commonConf.collectorId                           = Strings("common.collector_id", "127.0.0.1");
+    globalConf.commonConf.larkAlarmUrl                          = Strings("common.lark_alarm_url", "");
 
     return true;
 }

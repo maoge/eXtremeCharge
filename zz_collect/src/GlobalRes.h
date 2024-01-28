@@ -14,6 +14,7 @@ public:
     GlobalConf globalConf;
     string     prov = "吉林";
     bool       vacantEnabled = false;
+    bool       isRunning = true;
 
 };
 

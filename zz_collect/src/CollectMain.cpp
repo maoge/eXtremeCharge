@@ -15,29 +15,25 @@ using namespace ZZCollect;
 
 namespace ZZCollect
 {
-
-bool G_RUN = true;
-
 GlobalRes GLOBAL_RES;
 vector<MobileVacantProber*> MOBILE_PROBER_VEC;
-
 }
 
 void exitHandler(int signum)
 {
     // release global resource
     logger->info(LTRACE, "zz_collect exit signum: %d", signum);
-	G_RUN = false;
+    GLOBAL_RES.isRunning = false;
 
     vector<MobileVacantProber*>::iterator it = MOBILE_PROBER_VEC.begin();
-	vector<MobileVacantProber*>::iterator end = MOBILE_PROBER_VEC.end();
-	for (; it != end; it++)
+    vector<MobileVacantProber*>::iterator end = MOBILE_PROBER_VEC.end();
+    for (; it != end; it++)
     {
-		MobileVacantProber* prober = *it;
-		prober->StopRunning();
+        MobileVacantProber* prober = *it;
+        prober->StopRunning();
 
         delete prober;
-	}
+    }
     MOBILE_PROBER_VEC.clear();
 }
 
@@ -66,7 +62,8 @@ bool init()
 }
 
 void mainLoop() {
-    while (G_RUN) {
+    while (GLOBAL_RES.isRunning)
+    {
         VacantProberTool::refreshVacantSetting();
         sleep(20);
     }

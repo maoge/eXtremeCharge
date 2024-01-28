@@ -11,7 +11,7 @@ OBJS = AtomicBoolean.o AtomicInteger.o AtomicInt64.o Buffer.o InputStream.o IPCM
 	Object.o OutputStream.o Socket.o StringUtil.o Synchronized.o Utility.o CFile.o FileUtil.o \
 	StringBuffer.o ProgramOption.o ProcessUtil.o Thread.o RWMutex.o Mutex.o Semph.o EventMsqDispatch.o \
 	SimpleProcessPool.o MTNetServer.o STNetServer.o NetServer.o Resource.o ThreadPool.o TimerThread.o ConfigProperty.o \
-	ThreadLocal.o ProcessInfo.o cJSON.o UUID.o 
+	ThreadLocal.o ProcessInfo.o cJSON.o UUID.o
 LIB = libzz_tools_lwpr.a
 
 $(LIB) : $(OBJS)

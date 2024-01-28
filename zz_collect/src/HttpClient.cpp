@@ -1,6 +1,6 @@
 #include "HttpClient.h"
 
-HttpClient::HttpClient(void)
+HttpClient::HttpClient()
 	: m_bDebug(false)
 {
 
@@ -79,7 +79,7 @@ bool HttpClient::Post(const string& strUrl, const string& strPost, int connTimeo
 	return res == CURLE_OK;
 }
 
-bool HttpClient::Post(const string& strUrl, map<string, string>& headers, const string& strPost, int connTimeout, int readTimeout, string& strResponse)
+bool HttpClient::Post(const string& strUrl, const map<string, string>& headers, const string& strPost, int connTimeout, int readTimeout, string& strResponse)
 {
 	CURLcode res;
 
@@ -153,7 +153,7 @@ bool HttpClient::Get(const string & strUrl, int connTimeout, int readTimeout, st
 	return res == CURLE_OK;
 }
 
-bool HttpClient::Get(const string & strUrl, map<string, string>& headers, int connTimeout, int readTimeout, string & strResponse)
+bool HttpClient::Get(const string & strUrl, const map<string, string>& headers, int connTimeout, int readTimeout, string & strResponse)
 {
 	CURLcode res;
 
@@ -239,7 +239,7 @@ bool HttpClient::PostSSL(const string& strUrl, const string& strPost, const char
 	return res == CURLE_OK;
 }
 
-bool HttpClient::PostSSL(const string& strUrl, map<string, string>& headers, const string& strPost, const char* pCaPath, int connTimeout, int readTimeout, string& strResponse)
+bool HttpClient::PostSSL(const string& strUrl, const map<string, string>& headers, const string& strPost, const char* pCaPath, int connTimeout, int readTimeout, string& strResponse)
 {
 	CURLcode res;
 
@@ -331,7 +331,7 @@ bool HttpClient::GetSSL(const string& strUrl, const char* pCaPath, int connTimeo
 	return res == CURLE_OK;
 }
 
-bool HttpClient::GetSSL(const string& strUrl, map<string, string>& headers, const char* pCaPath, int connTimeout, int readTimeout, string& strResponse)
+bool HttpClient::GetSSL(const string& strUrl, const map<string, string>& headers, const char* pCaPath, int connTimeout, int readTimeout, string& strResponse)
 {
 	CURLcode res;
 
@@ -428,12 +428,12 @@ void HttpClient::SetDebug(bool bDebug)
 	m_bDebug = bDebug;
 }
 
-struct curl_slist* HttpClient::assembleHeaders(map<string, string>& headers)
+struct curl_slist* HttpClient::assembleHeaders(const map<string, string>& headers)
 {
     struct curl_slist *list = NULL;
 
-	map<string, string>::iterator it = headers.begin();
-	map<string, string>::iterator end = headers.end();
+	map<string, string>::const_iterator it = headers.begin();
+	map<string, string>::const_iterator end = headers.end();
 	for (; it != end; it++)
 	{
 		const string& key = it->first;

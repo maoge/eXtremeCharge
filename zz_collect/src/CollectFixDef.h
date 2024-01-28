@@ -16,16 +16,20 @@ namespace ZZCollect
 #define RET_CODE_OK                    0
 #define RET_CODE_NOK                  -1
 
-#define OPERATOR_UNICOM                0
-#define OPERATOR_TELECOM               1
-#define OPERATOR_CMCC                  2
+#define OPERATOR_TYPE_BUSY            -2
+#define OPERATOR_TYPE_UNKNOW          -1
+#define OPERATOR_TYPE_UNICOM           0
+#define OPERATOR_TYPE_TELECOM          1
+#define OPERATOR_TYPE_CMCC             2
 
 #define SLEEP_WHEN_NO_DATA             5
 #define VACANT_MAX_RETRY               5
-#define VACANT_RETRY_INTERVAL          1
+#define VACANT_RETRY_INTERVAL          3
+#define INTERVAL_WHEN_ERR              1
 #define SLEEP_WHEN_CK_EXPIRED          15
 #define VACANT_CONN_TIMEOUT            5
 #define VACANT_READ_TIMEOUT            5
+#define FETCH_INTERVAL                 15
 
 #define VACANT_ALARM_TYPE_MOBILE       1
 #define VACANT_ALARM_TYPE_UNICOM       2
@@ -39,6 +43,8 @@ namespace ZZCollect
 #define CHK_NEED_RETRY                 2          //  2.重试
 #define CHK_LOGIN_EXPIRED              3          //  3.登录过期
 #define CHK_OVERLOAD                   4          //  4.下单次数过多
+#define CHK_BUSY                       5          //  5.流控
+#define CHK_SERV_INVALID               6          //  6.后端服务暂停
 
 #define ALARM_TTL                      150000
 
@@ -53,6 +59,20 @@ namespace ZZCollect
 #define PHONE_STATUS_NONEXISTENCE     "531012"    // 此号码不存在
 #define PHONE_CHARGE_NOT_IN_SERVICE   "531002"    // 11点后不让缴费
 #define PHONE_STATUS_531008           "531008"    // 该号码不支持充值
+
+#define LOGIN_PARAMS                  "productNo=%s&requestType=H5&callback=&appType=03&appVersion=10.66.60&timestamp=%ld"
+#define URL_LOGIN_FACTOR              "https://mapi-h5.bestpay.com.cn/gapi/mapi-gateway/applyLoginFactor"
+#define AGREE_ID                      "20210525030100136633395265404954"
+#define DX_YZF_URL                    "https://mapi-h5.bestpay.com.cn/gapi/handyservice/communication/queryPhoneAttribution"
+
+#define URL_MUST_PAYMENT              "https://upay.10010.com/npfweb/NpfWeb/Mustpayment/getMustpayment?number=%s&province=%s&commonBean.phoneNo=%s&channelType=%s&GET"
+
+#define API_OPERATOR_YD               "yd"
+#define API_OPERATOR_LT               "lt"
+#define API_OPERATOR_DX               "dx"
+
+#define BUSY_INFO                     "{\"out\":\"busy\"}"
+#define ORIGINAL_FMT                  "{\"agreeId\":\"%s\",\"mobileNo\":\"%s\"}"
 
 class VacantTask
 {

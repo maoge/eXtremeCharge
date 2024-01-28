@@ -6,9 +6,12 @@ vacant_mobile_number_worker_pool_max_size=7
 vacant_mobile_switch=true
 
 [common]
-task_center_address="60.188.245.8:10002"
+task_center_address="47.116.73.188:9002"
 
 # 号码检测数据同步
-push_center_address="60.188.245.8:10002"
+push_center_address="47.116.73.188:9002"
 
 res_id=5
+
+collector_id="127.0.0.1"
+lark_alarm_url="https://open.feishu.cn/open-apis/bot/v2/hook/61fff032-474a-4ff4-9256-bb99fa2a72c1"

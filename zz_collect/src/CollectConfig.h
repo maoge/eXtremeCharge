@@ -24,6 +24,8 @@ public:
     int    resId;
     string taskCenterAddress;
     string pushCenterAddress;
+    string collectorId;
+    string larkAlarmUrl;  // lark_alarm_url="https://open.feishu.cn/open-apis/bot/v2/hook/61fff032-474a-4ff4-9256-bb99fa2a72c1"
 };
 
 class GlobalConf

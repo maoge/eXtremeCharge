@@ -44,7 +44,7 @@ void MobileVacantProber::Run()
         }
 
         VacantTask vacantTask;
-        if (!VacantProberTool::fetchVacantNumTask(m_sTaskCenterAddr, GLOBAL_RES.prov, OPERATOR_CMCC, resId, vacantTask))
+        if (!VacantProberTool::fetchVacantNumTask(m_sTaskCenterAddr, GLOBAL_RES.prov, OPERATOR_TYPE_CMCC, resId, vacantTask))
         {
             logger->info(LTRACE, "vacant mobile fetch with no data ....");
             sleep(SLEEP_WHEN_NO_DATA);
@@ -83,10 +83,10 @@ void MobileVacantProber::doNotify(const vector<VacantResult>& vacantResultVec)
     cJSON_Delete(pRoot);
 
     static string PUSH_URL = "http://" + GLOBAL_RES.globalConf.commonConf.pushCenterAddress + "/api/collect/notifyVacantNumTask";
+    HttpClient httpClient;
 
     for (int i = 0; i < VACANT_MAX_RETRY; i++)
     {
-        HttpClient httpClient;
         string strResponse;
         if (httpClient.Post(PUSH_URL, notifyData, 5, 5, strResponse))
         {
@@ -146,7 +146,7 @@ int MobileVacantProber::checkVacantPhone(const string& phone, const string& prov
     int provId = getProvId(prov);
     string payPhoneNo = phone.substr(0, 8);
 
-    string phoneEncData = ZZ_TOOLS::encrypt_cbc(phone, AES_KEY, AES_IV);
+    string phoneEncData = ZZ_TOOLS::AES_TOOL::encrypt_cbc(phone, AES_KEY, AES_IV);
     string base64PhoneData = base64_encode(phoneEncData);
 
 	int payRuleId = getPayRuleId(prov);
@@ -176,7 +176,7 @@ int MobileVacantProber::checkVacantPhone(const string& phone, const string& prov
     snprintf(buff, 255, IN_PARAM_SAVE_ORDER, amount, chargeMoney, chargeMoney, payRuleId, provId);
     string inParamSaveOrder(buff);
 
-    string aesDecodeInParamSaveOrder = ZZ_TOOLS::encrypt_cbc(inParamSaveOrder, AES_KEY, AES_IV);
+    string aesDecodeInParamSaveOrder = ZZ_TOOLS::AES_TOOL::encrypt_cbc(inParamSaveOrder, AES_KEY, AES_IV);
 
     string saveOrderData = "{\"inParam\":\"" + base64_encode(aesDecodeInParamSaveOrder) + "\"}";
     
