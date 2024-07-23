@@ -1,13 +1,9 @@
 #include <string>
 #include <iostream>
-#include <base64/base64.h>
 
 #include "lwpr.h"
 #include "GlobalRes.h"
-#include "MobileVacantProber.h"
-#include "CollectFixDef.h"
-#include "VacantProberTool.h"
-#include "Cipher.h"
+#include "MobileMigrateProber.h"
 
 using namespace std;
 using namespace ZZTools;
@@ -16,7 +12,7 @@ using namespace ZZCollect;
 namespace ZZCollect
 {
 GlobalRes GLOBAL_RES;
-vector<MobileVacantProber*> MOBILE_PROBER_VEC;
+vector<MobileMigrateProber*> PROBER_VEC;
 }
 
 void exitHandler(int signum)
@@ -25,16 +21,16 @@ void exitHandler(int signum)
     logger->info(LTRACE, "zz_collect exit signum: %d", signum);
     GLOBAL_RES.isRunning = false;
 
-    vector<MobileVacantProber*>::iterator it = MOBILE_PROBER_VEC.begin();
-    vector<MobileVacantProber*>::iterator end = MOBILE_PROBER_VEC.end();
+    vector<MobileMigrateProber*>::iterator it = PROBER_VEC.begin();
+    vector<MobileMigrateProber*>::iterator end = PROBER_VEC.end();
     for (; it != end; it++)
     {
-        MobileVacantProber* prober = *it;
+        MobileMigrateProber* prober = *it;
         prober->StopRunning();
 
         delete prober;
     }
-    MOBILE_PROBER_VEC.clear();
+    PROBER_VEC.clear();
 }
 
 bool initLogger()
@@ -87,10 +83,10 @@ void startWorker()
             snprintf(buff, 255, "mobile_prober_%02d", (i + 1));
             string proberName = string(buff);
 
-            MobileVacantProber* prober = new MobileVacantProber(sTaskCenterAddress, sPushCenterAddress, proberName);
+            MobileMigrateProber* prober = new MobileMigrateProber(sTaskCenterAddress, sPushCenterAddress, proberName);
             prober->Start();
 
-            MOBILE_PROBER_VEC.push_back(prober);
+            PROBER_VEC.push_back(prober);
             sleep(1);
         }
     }
@@ -98,7 +94,7 @@ void startWorker()
 
 int main(void)
 {
-    logger->info(LTRACE, "zz_collect start pid: %d", ProcessUtil::GetPID());
+    logger->info(LTRACE, "mobile_migrate_main start pid: %d", ProcessUtil::GetPID());
 
     ZZTools::Utility::RegisterSignal(SIGINT, exitHandler);
     ZZTools::Utility::RegisterSignal(SIGTERM, exitHandler);
@@ -107,27 +103,4 @@ int main(void)
 
     startWorker();
     mainLoop();
-    
-    // static const std::string AES_KEY(CMCC_AES_KEY);
-	// static const std::string AES_IV(CMCC_AES_IV);
-    
-	// string raw = "jsessionid-cmcc=n18A5C00C142C51C557A131284E556F49-1;jsessionid-cmcc=n18A5C00C142C51C557A131284E556F49-1;jsessionid-cmcc=n18A5C00C142C51C557A131284E556F49-1;jsessionid-cmcc=n18A5C00C142C51C557A131284E556F49-1;jsessionid-cmcc=n18A5C00C142C51C557A131284E556F49-1";
-	// string aesEnc = ZZ_TOOLS::encrypt_cbc(raw, AES_KEY, AES_IV);
-	// std::cout << "aesEnc:" << aesEnc << std::endl;
-
-	// MobileVacantProber prober("", "", "");
-    // int result = prober.checkVacantPhone("13829864870", "广东", "jsessionid-cmcc=nA8000364B602A087A0FE68D8F792E1FA-1");
-    // std::cout << "result:" << result << std::endl;
-
-    // string phone = "13829864870";
-
-    std::string skey(CMCC_AES_KEY);
-    std::string siv(CMCC_AES_IV);
-    std::string encryptedText = ZZ_TOOLS::encrypt_cbc(phone, skey, siv);
-    std::cout << "encryptedText:" << encryptedText << std::endl;
-
-    // std::string base64EncData = base64_encode(encryptedText);
-    // std::cout << "base64EncData:" << base64EncData << std::endl;
-
 }
-

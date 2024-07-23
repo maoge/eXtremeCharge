@@ -64,7 +64,7 @@ void startWorker()
     string sTaskCenterAddress = "http://" + commonConf.taskCenterAddress + "/api/collect/pullMigratePhone";
     string sPushCenterAddress = "http://" + commonConf.pushCenterAddress + "/api/collect/pushMigrateCheckResult";
 
-    string proberName = "migrate_checker";
+    string proberName = "unicom_vacant_checker";
     P_PROBER = new UnicomProber(sTaskCenterAddress, sPushCenterAddress, proberName);
     P_PROBER->Start();
 }

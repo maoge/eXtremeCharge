@@ -95,4 +95,67 @@ bool ChinaUnicomTools::notifyBusyAlarmMsg() {
     return ret;
 }
 
+int ChinaUnicomTools::getPhoneOperator(const string& phone)
+{
+    // "https://upay.10010.com/npfweb/NpfWeb/customInfo/cellInfoQuery?commonBean.phoneNo=%s&loginPhoneNo=&commonBean.channelType=101"
+    char buff[256] = { 0 };
+    snprintf(buff, 255, URL_CELL_INFO, phone.c_str());
+    string url(buff);
+    
+    int result = OPERATOR_TYPE_UNKNOW;
+    HttpClient httpClient;
+    
+    for (int i = 0; i < VACANT_MAX_RETRY; i++) {
+        string strResponse;
+        if (!httpClient.GetSSL(url, NULL, VACANT_CONN_TIMEOUT, VACANT_READ_TIMEOUT, strResponse)) {
+            sleep(INTERVAL_WHEN_ERR);
+            continue;
+        }
+
+        // {"isLogin":false,"carrier":"TEL","provinceCode":"038","cityCode":"380","custName":""}
+        // {"isLogin":false,"carrier":"MOB","provinceCode":"074","cityCode":"791","custName":""}
+        // {"isLogin":false,"carrier":"UNI","provinceCode":"084","cityCode":"844","is4g":true,"custName":""}
+        // {"isLogin":false,"carrier":"TEL","provinceCode":"084","cityCode":"841","custName":""}
+        // {"isLogin":false,"custName":""}
+        // {"out":"busy"}
+        if (strResponse.find(BUSY_INFO) != string::npos) {
+            logger->error(LTRACE, "unicom getMustpayment busy ....");
+            // 重试可能还是流控更加导致当前IP不可用
+            result = OPERATOR_TYPE_BUSY;
+            sleep(INTERVAL_WHEN_ERR);
+            // notifyBusyAlarmMsg();
+            break;
+        }
+
+        if (strResponse.empty()) {
+            sleep(INTERVAL_WHEN_ERR);
+            continue;
+        }
+
+        logger->info(LTRACE, "Unicom %s cellInfoQuery:%s", phone.c_str(), strResponse.c_str());
+
+        cJSON* pRoot = cJSON_Parse(strResponse.c_str());
+        cJSON* pRspCarrierItem = cJSON_GetObjectItem(pRoot, "carrier");
+        if (pRspCarrierItem == NULL) {
+            cJSON_Delete(pRoot);
+            sleep(INTERVAL_WHEN_ERR);
+            continue;
+        }
+
+        string rspCarrier = pRspCarrierItem->valuestring;
+        if (rspCarrier == "TEL") {
+            result = OPERATOR_TYPE_TELECOM;
+        } else if (rspCarrier == "MOB") {
+            result = OPERATOR_TYPE_CMCC;
+        } else if (rspCarrier == "UNI") {
+            result = OPERATOR_TYPE_UNICOM;
+        }
+        
+        cJSON_Delete(pRoot);
+        break;
+    }
+
+    return result;
+}
+
 }

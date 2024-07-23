@@ -25,7 +25,7 @@ namespace ZZCollect
 #define SLEEP_WHEN_NO_DATA             5
 #define VACANT_MAX_RETRY               5
 #define VACANT_RETRY_INTERVAL          3
-#define INTERVAL_WHEN_ERR              1
+#define INTERVAL_WHEN_ERR              15
 #define SLEEP_WHEN_CK_EXPIRED          15
 #define VACANT_CONN_TIMEOUT            5
 #define VACANT_READ_TIMEOUT            5
@@ -65,6 +65,7 @@ namespace ZZCollect
 #define AGREE_ID                      "20210525030100136633395265404954"
 #define DX_YZF_URL                    "https://mapi-h5.bestpay.com.cn/gapi/handyservice/communication/queryPhoneAttribution"
 
+#define URL_CELL_INFO                 "https://upay.10010.com/npfweb/NpfWeb/customInfo/cellInfoQuery?commonBean.phoneNo=%s&loginPhoneNo=&commonBean.channelType=101"
 #define URL_MUST_PAYMENT              "https://upay.10010.com/npfweb/NpfWeb/Mustpayment/getMustpayment?number=%s&province=%s&commonBean.phoneNo=%s&channelType=%s&GET"
 
 #define API_OPERATOR_YD               "yd"
@@ -100,6 +101,22 @@ public:
 public:
     string phone;
     int    status;
+};
+
+class MigrateResult
+{
+public:
+    MigrateResult(const string& strPhone, int iOper)
+        : phone(strPhone), oper(iOper)
+    {
+
+    }
+
+    ~MigrateResult() {  }
+
+private:
+    string phone;
+    int    oper;
 };
 
 }

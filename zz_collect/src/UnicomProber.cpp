@@ -98,14 +98,17 @@ bool UnicomProber::checkMigrate(string& rawData)
     m_taskCounter.IncrementAndGet();
     cJSON* resultJson = cJSON_CreateObject();
 
+    // {"phone":"13755491057","status":-3}
+    // [{"phone":"13510316981","operator":-1,"ori_operator":2}]
+
     cJSON* pRetInfo = cJSON_GetObjectItem(pRoot, HEADER_RET_INFO);
     string strPhone = cJSON_GetObjectItem(pRetInfo, "phone")->valuestring;
-    int phoneStatus = cJSON_GetObjectItem(pRetInfo, "status")->valueint;
+    // int phoneStatus = cJSON_GetObjectItem(pRetInfo, "status")->valueint;
     string sec = strPhone.substr(3, 5);
     cJSON_Delete(pRoot);
     
-    int realOperator = ChinaTelecomTools::getPhoneOperator(strPhone);
-    logger->info(LTRACE, "real operator: %d", realOperator);
+    int realOperator = OPERATOR_TYPE_UNICOM; // ChinaTelecomTools::getPhoneOperator(strPhone);
+    // logger->info(LTRACE, "real operator: %d", realOperator);
     cJSON_AddItemToObject(resultJson, "phone", cJSON_CreateString(strPhone.c_str()));
 
     // 移动低位段号码基本都是空号用于移动早期自己内部信令测试
@@ -128,7 +131,6 @@ bool UnicomProber::checkMigrate(string& rawData)
             int uniStatus = ChinaUnicomTools::checkUnicomPhoneVacant(strPhone);
             cJSON_AddItemToObject(resultJson, "operator", cJSON_CreateNumber(realOperator));
             cJSON_AddItemToObject(resultJson, "status", cJSON_CreateNumber(uniStatus));
-            
         }
         break;
     case OPERATOR_TYPE_TELECOM:

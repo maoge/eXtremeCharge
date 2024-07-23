@@ -103,7 +103,7 @@ bool ChinaTelecomTools::queryPhoneAttribution(const string& phone, const string&
     string key = ZZ_TOOLS::RSA_TOOL::rsa_pub_encrypt(mixedKey, embededPubKey);
     string data = ZZ_TOOLS::AES_TOOL::encrypt_cbc(orginalStr, mixedKey, "");
     
-    MD5 md5;
+    ZZTools::MD5 md5;
     string sign(md5.digestString(orginalStr.c_str()));
     transform(sign.begin(), sign.end(), sign.begin(), ::toupper);
 
