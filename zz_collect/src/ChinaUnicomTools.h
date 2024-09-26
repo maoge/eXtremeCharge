@@ -13,6 +13,7 @@ public:
 
 private:
     static bool notifyBusyAlarmMsg();
+    static void sleepSeconds(unsigned int sec);
 
 };
 

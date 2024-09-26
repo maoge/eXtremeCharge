@@ -21,6 +21,8 @@ public:
     bool   checkAttr(string& rawData);
     void   notifyResult(cJSON* resultJson);
 
+    static void sleepSeconds(unsigned int sec);
+
 private:
     string m_sTaskCenterAddr;
     string m_sPushCenterAddr;

@@ -1,4 +1,5 @@
 #include <lwpr.h>
+#include <thread>
 
 #include "ChinaUnicomTools.h"
 #include "LarkBotUtils.h"
@@ -14,6 +15,21 @@ namespace ZZCollect
 
 extern GlobalRes GLOBAL_RES;
 
+void ChinaUnicomTools::sleepSeconds(unsigned int sec)
+{
+	if (!sec)
+		return;
+	
+	do {
+		struct timeval tv;
+		
+		tv.tv_sec  = sec;
+		tv.tv_usec = 0;
+	
+		(void)select(0, NULL, NULL, NULL, &tv);
+	} while(0);
+}
+
 int ChinaUnicomTools::checkUnicomPhoneVacant(const string& phone)
 {
     // "https://upay.10010.com/npfweb/NpfWeb/Mustpayment/getMustpayment?number=%s&province=%s&commonBean.phoneNo=%s&channelType=%s&GET"
@@ -28,7 +44,8 @@ int ChinaUnicomTools::checkUnicomPhoneVacant(const string& phone)
     for (int i = 0; i < VACANT_MAX_RETRY; i++) {
         string strResponse;
         if (!httpClient.GetSSL(url, NULL, VACANT_CONN_TIMEOUT, VACANT_READ_TIMEOUT, strResponse)) {
-            sleep(INTERVAL_WHEN_ERR);
+            // std::this_thread::sleep_for(std::chrono::seconds(INTERVAL_WHEN_ERR));
+            sleepSeconds(INTERVAL_WHEN_ERR);
             continue;
         }
 
@@ -46,7 +63,8 @@ int ChinaUnicomTools::checkUnicomPhoneVacant(const string& phone)
         }
 
         if (strResponse.empty()) {
-            sleep(INTERVAL_WHEN_ERR);
+            // std::this_thread::sleep_for(std::chrono::seconds(INTERVAL_WHEN_ERR));
+            sleepSeconds(INTERVAL_WHEN_ERR);
             continue;
         }
 
@@ -56,7 +74,8 @@ int ChinaUnicomTools::checkUnicomPhoneVacant(const string& phone)
         cJSON* pRspCodeItem = cJSON_GetObjectItem(pRoot, "rspCode");
         if (pRspCodeItem == NULL) {
             cJSON_Delete(pRoot);
-            sleep(INTERVAL_WHEN_ERR);
+            // std::this_thread::sleep_for(std::chrono::seconds(INTERVAL_WHEN_ERR));
+            sleepSeconds(INTERVAL_WHEN_ERR);
             continue;
         }
 
@@ -108,7 +127,8 @@ int ChinaUnicomTools::getPhoneOperator(const string& phone)
     for (int i = 0; i < VACANT_MAX_RETRY; i++) {
         string strResponse;
         if (!httpClient.GetSSL(url, NULL, VACANT_CONN_TIMEOUT, VACANT_READ_TIMEOUT, strResponse)) {
-            sleep(INTERVAL_WHEN_ERR);
+            // std::this_thread::sleep_for(std::chrono::seconds(INTERVAL_WHEN_ERR));
+            sleepSeconds(INTERVAL_WHEN_ERR);
             continue;
         }
 
@@ -122,13 +142,15 @@ int ChinaUnicomTools::getPhoneOperator(const string& phone)
             logger->error(LTRACE, "unicom getMustpayment busy ....");
             // 重试可能还是流控更加导致当前IP不可用
             result = OPERATOR_TYPE_BUSY;
-            sleep(INTERVAL_WHEN_ERR);
+            // std::this_thread::sleep_for(std::chrono::seconds(INTERVAL_WHEN_ERR));
+            sleepSeconds(INTERVAL_WHEN_ERR);
             // notifyBusyAlarmMsg();
             break;
         }
 
         if (strResponse.empty()) {
-            sleep(INTERVAL_WHEN_ERR);
+            // std::this_thread::sleep_for(std::chrono::seconds(INTERVAL_WHEN_ERR));
+            sleepSeconds(INTERVAL_WHEN_ERR);
             continue;
         }
 
@@ -138,8 +160,10 @@ int ChinaUnicomTools::getPhoneOperator(const string& phone)
         cJSON* pRspCarrierItem = cJSON_GetObjectItem(pRoot, "carrier");
         if (pRspCarrierItem == NULL) {
             cJSON_Delete(pRoot);
-            sleep(INTERVAL_WHEN_ERR);
-            continue;
+            // {"isLogin":false,"custName":""}
+            // 不是联通，也不是原始归属移动运营商，只可能转移到电信还没来得及更新
+            result = OPERATOR_TYPE_TELECOM;
+            break;
         }
 
         string rspCarrier = pRspCarrierItem->valuestring;

@@ -1,5 +1,6 @@
 #include <nlohmann/json.hpp>
 #include <iostream>
+#include <thread>
 
 #include "Base64.h"
 #include "UnicomAttrProber.h"
@@ -15,12 +16,28 @@ namespace ZZCollect
 extern GlobalRes GLOBAL_RES;
 static const string PUMP_BODY = "{\"operator\":0}";
 
+void UnicomAttrProber::sleepSeconds(unsigned int sec)
+{
+	if (!sec)
+		return;
+	
+	do {
+		struct timeval tv;
+		
+		tv.tv_sec  = sec;
+		tv.tv_usec = 0;
+	
+		(void)select(0, NULL, NULL, NULL, &tv);
+	} while(0);
+}
+
 void UnicomAttrProber::Run()
 {
     while (IsContinue()) {
         string rawData = pumpData();
         if (rawData.empty()) {
-            sleep(VACANT_RETRY_INTERVAL);
+            // std::this_thread::sleep_for(std::chrono::seconds(VACANT_RETRY_INTERVAL));
+            sleepSeconds(VACANT_RETRY_INTERVAL);
             continue;
         }
         
@@ -46,7 +63,8 @@ string UnicomAttrProber::pumpData()
         else
         {
             logger->error(LTRACE, "pumpData NOK, url: %s, retry ....", m_sTaskCenterAddr.c_str());
-            sleep(VACANT_RETRY_INTERVAL);
+            // std::this_thread::sleep_for(std::chrono::seconds(VACANT_RETRY_INTERVAL));
+            sleepSeconds(VACANT_RETRY_INTERVAL);
         }
     }
 
@@ -74,7 +92,8 @@ void UnicomAttrProber::notifyResult(cJSON* resultJson)
         else
         {
             logger->error(LTRACE, "notifyResult NOK, url: %s, retry ....", m_sPushCenterAddr.c_str());
-            sleep(VACANT_RETRY_INTERVAL);
+            // std::this_thread::sleep_for(std::chrono::seconds(VACANT_RETRY_INTERVAL));
+            sleepSeconds(VACANT_RETRY_INTERVAL);
         }
     }
 
@@ -90,7 +109,8 @@ bool UnicomAttrProber::checkAttr(string& rawData)
     if (retCode != RET_CODE_OK)
     {
         cJSON_Delete(pRoot);
-        sleep(FETCH_INTERVAL);
+        // std::this_thread::sleep_for(std::chrono::seconds(FETCH_INTERVAL));
+        sleepSeconds(FETCH_INTERVAL);
         return false;
     }
 
@@ -101,7 +121,8 @@ bool UnicomAttrProber::checkAttr(string& rawData)
     if (!pRetInfo)
     {
         cJSON_Delete(pRoot);
-        sleep(FETCH_INTERVAL);
+        // std::this_thread::sleep_for(std::chrono::seconds(FETCH_INTERVAL));
+        sleepSeconds(FETCH_INTERVAL);
         return false;
     }
 
@@ -125,7 +146,8 @@ bool UnicomAttrProber::checkAttr(string& rawData)
         logger->info(LTRACE, "real operator: %d", realOperator);
         logger->info(LTRACE, "task count: %d, unicom call: %d", m_taskCounter.Get(), m_callCounter.IncrementAndGet());
         
-        sleep(FETCH_INTERVAL);  // 防止频繁请求联通网厅触发流控
+        // std::this_thread::sleep_for(std::chrono::seconds(FETCH_INTERVAL)); // 防止频繁请求联通网厅触发流控
+        sleepSeconds(FETCH_INTERVAL);
     }
 
     cJSON_Delete(pRoot);
